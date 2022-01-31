@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  rent-predict-service:
+    build: .
+    image: rent_predict
+    command: uvicorn server:app --use-colors --host 0.0.0.0 --port 8080
+    volumes:
+      - .:/usr/src/app
+    ports:
+      - "8080:8080"
+    container_name: rent-predict-service

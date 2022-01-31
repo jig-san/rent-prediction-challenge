@@ -44,7 +44,6 @@ DB_COLUMS = (
     'telekomTvOffer',
     'telekomUploadSpeed',
     'thermalChar',
-    'totalRent',
     'typeOfFlat',
     'yearConstructed',
     'yearConstructedRange'

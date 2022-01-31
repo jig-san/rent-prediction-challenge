@@ -1,0 +1,8 @@
+# intellij
+.idea/
+
+# compiled
+__pycache__/
+
+# data
+database/

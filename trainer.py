@@ -12,6 +12,6 @@ gbr_module = GradientBoostModule()
 
 
 if __name__ == "__main__":
-    params = gbr_module.train(DB_HOST, GRID_SEARCH_PARAMS)
+    params = gbr_module.train(GRID_SEARCH_PARAMS)
     gbr_module.write_model(BASE_MODEL_PATH)
     logger.info(f"Training complete, final params: {params}")

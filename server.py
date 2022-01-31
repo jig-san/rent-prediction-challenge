@@ -3,7 +3,6 @@ from logging.config import dictConfig
 from typing import List
 
 import nltk
-import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -25,7 +24,7 @@ class Requests(BaseModel):
 @app.get("/train")
 def train():
     train_params = gbr_module.model.get_params()
-    gbr_module.train(DB_HOST, train_params)
+    gbr_module.train(train_params)
     gbr_module.write_model(MODEL_PATH)
     return {"status": "success"}
 
@@ -50,7 +49,7 @@ def load_model():
         healthy = True
         logger.info("Model load complete")
     except Exception as e:
-        logger.error(f"Cannot find trained model {str(e)}")
+        logger.info(f"Cannot find temporary model {str(e)}")
         logger.info(f"Loading base model")
         logger.info("Model load complete")
         try:
@@ -61,6 +60,3 @@ def load_model():
             logger.error(f"SEVERE: No models found {str(e)}")
             raise
 
-
-if __name__ == "__main__":
-    uvicorn.run("server:app", host="127.0.0.1", port=5000, use_colors=True, reload=True)

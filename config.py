@@ -8,6 +8,9 @@ GRID_SEARCH_PARAMS = {
     "random_state": [42]
 }
 MODEL_PATH = "gbr_model_best_tmp.pkl"
-BASE_MODEL_PATH = "grid_gbr_model_best.pkl"
-DB_HOST = None
-DB_PORT = None
+BASE_MODEL_PATH = "gbr_model_best.pkl"
+DB_HOST = "localhost"
+DB_PORT = "5432"
+DB_USER = "postgres"
+DB_PASSWORD = "adminpsql"
+LOCAL_DATA_PATH = "database/immo_data.csv"

@@ -7,15 +7,18 @@ from datetime import timedelta
 from logging.config import dictConfig
 
 import pandas as pd
+from sqlalchemy import create_engine
+import pandas.io.sql as psql
 from nltk.corpus import stopwords
 from nltk.stem.snowball import GermanStemmer
 from nltk.tokenize import RegexpTokenizer
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import shuffle
 
+from config import *
 from base_module.module_config import *
 from base_module.log_config import LogConfig
 
@@ -40,9 +43,16 @@ def _split_into_train_val_test(dataframe, train_ratio=.8, val_ratio=.2):
 
     return train_set, val_set, test_set
 
-def _read_df(path):
-    # TODO: read from postgres db
-    return pd.read_csv(path)
+def _read_df():
+    try:
+        logger.info("Reading data from database")
+        engine = create_engine(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/rentaldata")
+        connection = engine.connect()
+        return psql.read_sql_table("immo_data", connection).drop("index", axis=1)
+    except Exception as e:
+        logger.info(f"Table not found: {str(e)}")
+        logger.info(f"Fetching local .csv data")
+        return pd.read_csv(LOCAL_DATA_PATH)
 
 
 def _get_non_outlier_indices(series):
@@ -124,6 +134,7 @@ def _train_with_params(train_X, train_Y, val_X, val_Y, params):
     Fits Gradient Boosting Regression with given hyperparameters
     :return: fit model, train and validation scores
     """
+    logger.info("Training in progress ...")
     gbr = GradientBoostingRegressor(**params)
     gbr.fit(train_X, train_Y)
     score_val = gbr.score(val_X, val_Y)
@@ -157,17 +168,17 @@ class GradientBoostModule:
         self.encoder_one_hot = None
         self.encoder_labels = None
 
-    def train(self, db_host, model_params):
+    def train(self, model_params):
 
         logger.info("Reading training data")
 
-        dataframe = _read_df("database/immo_data.csv")
+        dataframe = _read_df()
         dataframe = dataframe.reindex(sorted(dataframe.columns), axis=1)
 
         logger.info("Reading complete")
 
         # shuffling the dataset once
-        dataframe = shuffle(dataframe, random_state=42)[: len(dataframe) // 20]
+        dataframe = shuffle(dataframe, random_state=42)
 
         # throw away the rows where targets are undefined
         dataframe = _filter_invalid_targets(dataframe)
@@ -179,8 +190,10 @@ class GradientBoostModule:
 
         dataframe = self.process_features(dataframe)
 
+        logger.info("Splitting data into train, val, test")
         train_Y, val_Y, test_Y = _split_into_train_val_test(df_target.values)
         train_X, val_X, test_X = _split_into_train_val_test(dataframe.values)
+        logger.info("Splits ready")
 
         if all(isinstance(v, list) for v in model_params.values()):
             model_configs = _get_search_configurations(model_params)
@@ -232,7 +245,9 @@ class GradientBoostModule:
 
     def process_features(self, dataframe):
         dataframe.drop(FIELDS_TO_IGNORE, axis=1, inplace=True)
-        dataframe.drop("totalRent", axis=1, inplace=True)
+        # if the method is called from predict, dataframe does not have target column
+        if "totalRent" in dataframe:
+            dataframe.drop("totalRent", axis=1, inplace=True)
         dataframe = self.transform_struct_fields(dataframe)
         dataframe = self.transform_text_fields(dataframe)
         # fill missing data
@@ -246,7 +261,7 @@ class GradientBoostModule:
         for col in df_columns_list:
             # transform selected categorical features into one hot vectors
             if col in ONE_HOT_COLUMNS:
-                one_dataframe = pd.DataFrame(self.encoder_one_hot[col].transform(dataframe[col].astype(str)))
+                one_dataframe = pd.DataFrame(self.encoder_one_hot[col].transform(dataframe[col].values.reshape(-1, 1)).toarray())
                 dataframe = pd.concat([dataframe, one_dataframe], axis=1).drop(col, axis=1)
             # transform True/False boolean values to 1/0
             elif dataframe[col].dtype == "bool":
@@ -275,15 +290,15 @@ class GradientBoostModule:
         return dataframe
 
     def create_encoders(self, dataframe):
-        logger.info("Fitting LabelBinarizer, TfidfVectorizer and LabelEncoder")
+        logger.info("Fitting OneHotEncoder, TfidfVectorizer and LabelEncoder")
         encoders_start = time.time()
         self.encoder_one_hot = {}
         self.encoder_labels = {}
         self.encoder_tfidf = {}
         for col in dataframe.columns.to_list():
             if col in ONE_HOT_COLUMNS:
-                encoder = LabelBinarizer()
-                encoder.fit(dataframe[col].astype(str))
+                encoder = OneHotEncoder(handle_unknown='ignore')
+                encoder.fit(dataframe[col].values.reshape(-1, 1))
                 self.encoder_one_hot[col] = encoder
             elif col in TEXT_FIELDS:
                 processed_documents = _get_processed_documents(dataframe[col].astype("str").to_list())
