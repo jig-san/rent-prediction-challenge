@@ -25,7 +25,7 @@ class Requests(BaseModel):
 def train():
     global gbr_module
     train_params = gbr_module.model.get_params()
-    # create new instance of the mode
+    # create new instance of the model
     # so the old one is available while the new one is being trained
     gbr_module_new = GradientBoostModule()
     gbr_module_new.train(DB_HOST, train_params)

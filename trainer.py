@@ -9,6 +9,7 @@ dictConfig(LogConfig().dict())
 logger = logging.getLogger("prod_logger")
 
 if __name__ == "__main__":
+    # create model's instance, train and save the trained model
     gbr_module = GradientBoostModule()
     params = gbr_module.train(DB_HOST_LOCAL, GRID_SEARCH_PARAMS)
     gbr_module.write_model(BASE_MODEL_PATH)

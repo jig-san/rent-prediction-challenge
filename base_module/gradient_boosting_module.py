@@ -43,6 +43,11 @@ def _split_into_train_val_test(dataframe, train_ratio=.8, val_ratio=.2):
     return train_set, val_set, test_set
 
 def _read_df(db_host):
+    """
+    Fetch the dataset from db, if cannot connect - read from file.
+    In the real production, there wouldn't be any reading from file of course,
+    this part is for the testing purposes.
+    """
     try:
         logger.info("Reading data from database")
         engine = create_engine(f"postgresql://{DB_USER}:{DB_PASSWORD}@{db_host}:{DB_PORT}/rentaldata")
@@ -144,6 +149,10 @@ def _train_with_params(train_X, train_Y, val_X, val_Y, params):
     return gbr, score_train, score_val
 
 def _train_with_grid_search(train_X, train_Y, val_X, val_Y, configurations):
+    """
+    Performs grid search with a given list of model's configurations,
+    returns best model
+    """
     max_score = 0
     best_model = None
     logger.info("Grid search started")
@@ -190,6 +199,8 @@ class GradientBoostModule:
             for col in TEXT_FIELDS:
                 dataframe = dataframe.drop(col, axis=1)
 
+        # fit all the necessary encoders first,
+        # since they will be stored together with the model
         self.create_encoders(dataframe)
 
         dataframe = self.process_features(dataframe)
@@ -200,25 +211,36 @@ class GradientBoostModule:
         logger.info("Splits ready")
 
         if all(isinstance(v, list) for v in model_params.values()):
+            # if the train function is given the dict of string:list pairs,
+            # do grid search
             model_configs = _get_search_configurations(model_params)
             self.model = _train_with_grid_search(train_X, train_Y, val_X, val_Y, model_configs)
             logger.info(f"Test score :{self.model.score(test_X, test_Y)}")
         elif any(isinstance(v, list) for v in model_params.values()):
+            # if the train function is given mixed input, error
             logger.error("ERROR: wrong format parameters")
         else:
+            # if the model is given the dict of string:value pairs,
+            # do a regular one run of training
             self.model, score_train, score_val = _train_with_params(train_X, train_Y, val_X, val_Y, model_params)
             logger.info(f"Test score: {self.model.score(test_X, test_Y)}")
 
         return self.model.get_params()
 
     def predict(self, records):
+        """
+        Gets as input the vector of feature records
+        and returns the vector of predicted prices
+        """
         dataframe = pd.DataFrame.from_records(records)
         for col in dataframe.columns:
             if col not in DB_COLUMNS:
+                # can just remove the previously unknown fields
                 dataframe.drop(col, axis=1, inplace=True)
                 logger.info(f"Removed unknown field {col}")
         for col in DB_COLUMNS:
             if col not in dataframe.columns:
+                # error if fields are missing in the record
                 dataframe.insert(0, col, 0)
                 logger.error(f"SEVERE: missing field {col}")
                 raise ValueError(f"Missing field {col} in data")
@@ -234,6 +256,7 @@ class GradientBoostModule:
             return {"status": "error", "message": str(e)}
 
     def write_model(self, path):
+        """Pickles the trained model together with the trained encoders"""
         obj = {
             "model": self.model,
             "encoder_tfidf": self.encoder_tfidf,
@@ -243,6 +266,7 @@ class GradientBoostModule:
         _write_pickle_object(obj, path)
 
     def read_model(self, path):
+        """ Reads the trained regression model together with the trained encoders """
         obj = _read_pickle_object(path)
         self.model, self.encoder_tfidf, self.encoder_one_hot, self.encoder_labels = \
             obj["model"], obj["encoder_tfidf"], obj["encoder_one_hot"], obj["encoder_labels"]
@@ -295,6 +319,7 @@ class GradientBoostModule:
         return dataframe
 
     def create_encoders(self, dataframe):
+        """Process columns one by one, and fit three encoders on the categorical data"""
         logger.info("Fitting OneHotEncoder, TfidfVectorizer and LabelEncoder")
         encoders_start = time.time()
         self.encoder_one_hot = {}
