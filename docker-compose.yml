@@ -1,12 +1,28 @@
 version: "3.9"
 
 services:
+  db:
+    image: postgres:14.1-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=rentaldata
+    volumes:
+      - db:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    container_name: rent-predict-db
   rent-predict-service:
     build: .
     image: rent_predict
-    command: uvicorn server:app --use-colors --host 0.0.0.0 --port 8080
+    depends_on:
+      - db
+    command: bash -c "rm -f gbr_model_best_tmp.pkl && python3 create_db.py && uvicorn server:app --use-colors --host 0.0.0.0 --port 8080"
     volumes:
       - .:/usr/src/app
     ports:
       - "8080:8080"
     container_name: rent-predict-service
+volumes:
+  db:
+    driver: local

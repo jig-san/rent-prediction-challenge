@@ -1,7 +1,7 @@
 import logging
 from logging.config import dictConfig
 from base_module.log_config import LogConfig
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy_utils import database_exists, create_database
 import pandas as pd
 
@@ -15,7 +15,8 @@ if not database_exists(engine.url):
     logger.info("Creating database")
     create_database(engine.url)
 
-logger.info("Exporing dataset to database...")
-df = pd.read_csv(LOCAL_DATA_PATH)
-df.to_sql('immo_data', engine)
-logger.info("Export complete")
+if not inspect(engine).has_table("immo_data"):
+    logger.info("Exporting dataset to database...")
+    df = pd.read_csv(LOCAL_DATA_PATH)
+    df.to_sql('immo_data', engine)
+    logger.info("Export complete")

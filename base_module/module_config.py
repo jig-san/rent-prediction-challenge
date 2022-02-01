@@ -1,4 +1,4 @@
-DB_COLUMS = (
+DB_COLUMNS = (
     'balcony',
     'baseRent',
     'baseRentRange',

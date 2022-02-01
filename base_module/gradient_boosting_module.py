@@ -7,21 +7,20 @@ from datetime import timedelta
 from logging.config import dictConfig
 
 import pandas as pd
-from sqlalchemy import create_engine
 import pandas.io.sql as psql
 from nltk.corpus import stopwords
 from nltk.stem.snowball import GermanStemmer
 from nltk.tokenize import RegexpTokenizer
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import shuffle
+from sqlalchemy import create_engine
 
-from config import *
-from base_module.module_config import *
 from base_module.log_config import LogConfig
-
+from base_module.module_config import *
+from config import *
 
 dictConfig(LogConfig().dict())
 logger = logging.getLogger("prod_logger")
@@ -43,10 +42,10 @@ def _split_into_train_val_test(dataframe, train_ratio=.8, val_ratio=.2):
 
     return train_set, val_set, test_set
 
-def _read_df():
+def _read_df(db_host):
     try:
         logger.info("Reading data from database")
-        engine = create_engine(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/rentaldata")
+        engine = create_engine(f"postgresql://{DB_USER}:{DB_PASSWORD}@{db_host}:{DB_PORT}/rentaldata")
         connection = engine.connect()
         return psql.read_sql_table("immo_data", connection).drop("index", axis=1)
     except Exception as e:
@@ -168,11 +167,11 @@ class GradientBoostModule:
         self.encoder_one_hot = None
         self.encoder_labels = None
 
-    def train(self, model_params):
+    def train(self, db_host, model_params):
 
         logger.info("Reading training data")
 
-        dataframe = _read_df()
+        dataframe = _read_df(db_host)
         dataframe = dataframe.reindex(sorted(dataframe.columns), axis=1)
 
         logger.info("Reading complete")
@@ -185,6 +184,11 @@ class GradientBoostModule:
 
         # split into target and feature columns
         df_target = dataframe.totalRent
+
+        # the value for USE_TEXT_FIELDS is set in config.py
+        if not USE_TEXT_FIELDS:
+            for col in TEXT_FIELDS:
+                dataframe = dataframe.drop(col, axis=1)
 
         self.create_encoders(dataframe)
 
@@ -210,10 +214,10 @@ class GradientBoostModule:
     def predict(self, records):
         dataframe = pd.DataFrame.from_records(records)
         for col in dataframe.columns:
-            if col not in DB_COLUMS:
+            if col not in DB_COLUMNS:
                 dataframe.drop(col, axis=1, inplace=True)
-                logger.info(f"SEVERE: removed unknown field {col}")
-        for col in DB_COLUMS:
+                logger.info(f"Removed unknown field {col}")
+        for col in DB_COLUMNS:
             if col not in dataframe.columns:
                 dataframe.insert(0, col, 0)
                 logger.error(f"SEVERE: missing field {col}")
@@ -249,7 +253,8 @@ class GradientBoostModule:
         if "totalRent" in dataframe:
             dataframe.drop("totalRent", axis=1, inplace=True)
         dataframe = self.transform_struct_fields(dataframe)
-        dataframe = self.transform_text_fields(dataframe)
+        if USE_TEXT_FIELDS:
+            dataframe = self.transform_text_fields(dataframe)
         # fill missing data
         dataframe.fillna(0, inplace=True)
         return dataframe

@@ -7,8 +7,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from base_module.gradient_boosting_module import GradientBoostModule
-from config import *
 from base_module.log_config import LogConfig
+from config import *
 
 dictConfig(LogConfig().dict())
 logger = logging.getLogger("prod_logger")
@@ -21,11 +21,17 @@ healthy = False
 class Requests(BaseModel):
     data: List
 
-@app.get("/train")
+@app.post("/train")
 def train():
+    global gbr_module
     train_params = gbr_module.model.get_params()
-    gbr_module.train(train_params)
-    gbr_module.write_model(MODEL_PATH)
+    # create new instance of the mode
+    # so the old one is available while the new one is being trained
+    gbr_module_new = GradientBoostModule()
+    gbr_module_new.train(DB_HOST, train_params)
+    gbr_module_new.write_model(MODEL_PATH)
+    # update current model
+    gbr_module = gbr_module_new
     return {"status": "success"}
 
 @app.get("/healthy")

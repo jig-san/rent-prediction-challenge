@@ -8,10 +8,8 @@ from base_module.log_config import LogConfig
 dictConfig(LogConfig().dict())
 logger = logging.getLogger("prod_logger")
 
-gbr_module = GradientBoostModule()
-
-
 if __name__ == "__main__":
-    params = gbr_module.train(GRID_SEARCH_PARAMS)
+    gbr_module = GradientBoostModule()
+    params = gbr_module.train(DB_HOST_LOCAL, GRID_SEARCH_PARAMS)
     gbr_module.write_model(BASE_MODEL_PATH)
     logger.info(f"Training complete, final params: {params}")

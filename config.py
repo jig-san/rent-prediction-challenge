@@ -9,8 +9,10 @@ GRID_SEARCH_PARAMS = {
 }
 MODEL_PATH = "gbr_model_best_tmp.pkl"
 BASE_MODEL_PATH = "gbr_model_best.pkl"
-DB_HOST = "localhost"
+DB_HOST_LOCAL = "localhost"
+DB_HOST = "db"
 DB_PORT = "5432"
 DB_USER = "postgres"
-DB_PASSWORD = "adminpsql"
-LOCAL_DATA_PATH = "database/immo_data.csv"
+DB_PASSWORD = "postgres"
+LOCAL_DATA_PATH = "immo_data.csv"
+USE_TEXT_FIELDS = False
