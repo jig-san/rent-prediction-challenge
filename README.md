@@ -29,6 +29,7 @@ should be placed into the root folder of the project.
 When the database container is up, you can also start the local training by simply running:
 
 ```
+pip3 install -r requirements.txt
 python3 trainer.py
 ```
 
